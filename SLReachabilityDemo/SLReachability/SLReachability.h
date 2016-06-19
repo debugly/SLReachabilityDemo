@@ -26,22 +26,19 @@ typedef NS_ENUM(NSInteger,SLReachStatus) {
     SLReachableViaWWAN
 };
 
-typedef NS_ENUM(NSUInteger, SLNetWorkStatus) {
-    ///网络不可用；
-    SLNetWorkStatusUnavailable,
+typedef NS_ENUM(NSUInteger, SLWWANStatus) {
+    SLWWANNotReachable = SLNotReachable,
     ///不允许WWAN网络；默认允许
-    SLNetWorkStatusWWANRefused,
-    ///使用wifi；
-    SLNetWorkStatusWiFi,//SLNetWorkStatus not contain!
+    SLNetWorkStatusWWANRefused = 3,
     ///使用WWAN；
-    SLNetWorkStatusWWAN4G,
-    SLNetWorkStatusWWAN3G,
-    SLNetWorkStatusWWAN2G,
+    SLNetWorkStatusWWAN4G = 4,
+    SLNetWorkStatusWWAN3G = 5,
+    SLNetWorkStatusWWAN2G = 6,
 };
 
-typedef NS_OPTIONS(NSUInteger, SLNetWorkStatusMask) {
-    SLNetWorkStatusMaskUnavailable   = 1 << SLNetWorkStatusUnavailable,
-    SLNetWorkStatusMaskReachableWiFi = 1 << SLNetWorkStatusWiFi,
+typedef NS_ENUM(NSUInteger, SLNetWorkStatusMask) {
+    SLNetWorkStatusMaskUnavailable   = 1 << SLNotReachable,
+    SLNetWorkStatusMaskReachableWiFi = 1 << SLReachableViaWiFi,//这里直接使用这个枚举即可
     SLNetWorkStatusMaskWWANRefused   = 1 << SLNetWorkStatusWWANRefused,
     
     SLNetWorkStatusMaskReachableWWAN4G = 1 << SLNetWorkStatusWWAN4G,
@@ -58,14 +55,16 @@ NS_INLINE BOOL isWiFiWithMask(SLNetWorkStatusMask mask)
     return mask & SLNetWorkStatusMaskReachableWiFi;
 }
 
-NS_INLINE BOOL isWiFiWithStatus(SLReachStatus mask)
+NS_INLINE BOOL isWiFiWithStatus(SLReachStatus status)
 {
-    return mask == SLReachableViaWiFi;
+    return status == SLReachableViaWiFi;
 }
 
-
+///网络状态变化，同 Reachability
 FOUNDATION_EXTERN NSString *const kSLReachabilityReachStatusChanged;
+///WWAN变化；WiFi网络也会变，跟当前网络有关；
 FOUNDATION_EXTERN NSString *const kSLReachabilityWWANChanged;
+///统一后的网络变化
 FOUNDATION_EXTERN NSString *const kSLReachabilityMaskChanged;
 
 @interface SLReachability : NSObject
@@ -95,7 +94,7 @@ FOUNDATION_EXTERN NSString *const kSLReachabilityMaskChanged;
 ///reachable: Wifi-WWAN-NotReach
 @property (nonatomic, assign, readonly) SLReachStatus reachStatus;
 ///WWAN: 2、3、4G
-@property (nonatomic, assign, readonly) SLNetWorkStatus wwanType;
+@property (nonatomic, assign, readonly) SLWWANStatus wwanType;
 
 ///default is yes,sub class can assign me;
 @property (nonatomic, assign, getter=isAllowUseWWAN)BOOL allowUseWWAN;

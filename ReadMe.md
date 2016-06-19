@@ -1,60 +1,130 @@
 
 SLReachability 与 Reachability 的区别
-============
-The Reachability sample application demonstrates how to use the System Configuration framework to monitor the network state of an iOS device. In particular, it demonstrates how to know when IP can be routed and when traffic will be routed through a Wireless Wide Area Network (WWAN) interface such as EDGE or 3G.
+====================================
 
-Note: Reachability cannot tell your application if you can connect to a particular host, only that an interface is available that might allow a connection, and whether that interface is the WWAN. To understand when and how to use Reachability, read [Networking Overview][1].
+Reachability 只能检测网络的变化，包括 WiFi ，WWAN 和 NoReachable；不能细分 WWAN，不能参与用户的设置（某些App在设置里有设置允许使用3G的开关）；
 
-[1]: <http://developer.apple.com/library/ios/#documentation/NetworkingInternetWeb/Conceptual/NetworkingOverview/>
+SLReachability 兼容 Reachability ，因为内部关于网络变化的实现和 Reachability 一样，完全 copy 过来的；另外还检测了 WWAN 的变化，并且考虑到了用户可能会增加允许使用 WWAN 的开关；SLReachability 把以上几种网络情况最终作了统一，方便开发者使用；
+
+这是 Reachability 源码的地址：[https://developer.apple.com/library/prerelease/content/samplecode/Reachability/Listings/Reachability_Reachability_h.html][1]
+
+设计思路
+=======
+首要要完全兼容 Reachability ，具备 Reachability 的所有功能，其次还要拥有上面提到的检测 WWAN 变化的需求和允许用户增加开关；先看下如何兼容：
+
+- 完全兼容 Reachability 实现
+
+```objc
+typedef NS_ENUM(NSInteger,SLReachStatus) {
+    SLNotReachable = 0,
+    SLReachableViaWiFi,
+    SLReachableViaWWAN
+};
+
+@property (nonatomic, assign, readonly) SLReachStatus reachStatus;
+
+```
+这个没什么难理解的，不在细说了；
+
+- 检测 WWAN 的变化，这里有一下几种情况，SLNetWorkStatusWWANRefused 表示当前是 WWAN 网络，但是用户设置开关是关，不允许使用；
+
+```objc
+typedef NS_ENUM(NSUInteger, SLWWANStatus) {
+    SLWWANNotReachable = SLNotReachable,
+    ///不允许WWAN网络；默认允许
+    SLNetWorkStatusWWANRefused = 3,
+    ///使用WWAN；
+    SLNetWorkStatusWWAN4G = 4,
+    SLNetWorkStatusWWAN3G = 5,
+    SLNetWorkStatusWWAN2G = 6,
+};
+
+@property (nonatomic, assign, readonly) SLNetWorkStatus wwanType;
+
+```
+
+- 统一所有的网络状况
+
+```objc
+typedef NS_ENUM(NSUInteger, SLNetWorkStatusMask) {
+    SLNetWorkStatusMaskUnavailable   = 1 << SLNotReachable,
+    SLNetWorkStatusMaskReachableWiFi = 1 << SLReachableViaWiFi,//这里直接使用这个枚举即可
+    SLNetWorkStatusMaskWWANRefused   = 1 << SLNetWorkStatusWWANRefused,
+    
+    SLNetWorkStatusMaskReachableWWAN4G = 1 << SLNetWorkStatusWWAN4G,
+    SLNetWorkStatusMaskReachableWWAN3G = 1 << SLNetWorkStatusWWAN3G,
+    SLNetWorkStatusMaskReachableWWAN2G = 1 << SLNetWorkStatusWWAN2G,
+    
+    SLNetWorkStatusMaskReachableWWAN = (SLNetWorkStatusMaskReachableWWAN2G | SLNetWorkStatusMaskReachableWWAN3G | SLNetWorkStatusMaskReachableWWAN4G),
+    SLNetWorkStatusMaskNotReachable  = (SLNetWorkStatusMaskUnavailable     | SLNetWorkStatusMaskWWANRefused),
+    SLNetWorkStatusMaskReachable     = (SLNetWorkStatusMaskReachableWiFi   | SLNetWorkStatusMaskReachableWWAN),
+};
+
+```
+
+这里需要解释下：
+
+|--Mask--|--含义--|
+|--------|---------|
+|SLNetWorkStatusMaskReachableWWAN|只要当前是 2G，3G，4G 网络的一种属于ReachableWWAN|
+|SLNetWorkStatusMaskNotReachable|当前没有网络 或者 当前是WWAN网络 (用户不允许)|
+|SLNetWorkStatusMaskReachable|当前是WiFi网络 或者 当前是WWAN网络（用户允许）|
+
+
+便利方法：
+=======
+
+判断当前网络是不是 WiFi，当然你也可以扩展更多：
+
+```objc
+NS_INLINE BOOL isWiFiWithMask(SLNetWorkStatusMask mask)
+{
+    return mask & SLNetWorkStatusMaskReachableWiFi;
+}
+
+NS_INLINE BOOL isWiFiWithStatus(SLReachStatus status)
+{
+    return mask == SLReachableViaWiFi;
+}
+
+```
+
+
+使用方法1
+========
+```objc
+ _reach = [SLReachability reachabilityForInternetConnection];
+    //添加 observer
+    [_reach addObserver:self forKeyPath:@"netWorkMask" options:NSKeyValueObservingOptionNew context:nil];
+    //获取当前的网络状态；
+    SLNetWorkStatusMask mask = _reach.netWorkMask;
+```
+处理网络变化：
+
+```objc
+- (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary<NSString *,id> *)change context:(void *)context
+{
+    NSNumber *statusNum = [change objectForKey:NSKeyValueChangeNewKey];
+    SLNetWorkStatusMask mask = [statusNum intValue];
+    //根据当前网络做出处理；
+}
+```
+
+使用方法2
+========
+除了可以 Observe 属性之外，当然也可以注册通知：
+
+```objc
+///网络状态变化，同 Reachability
+FOUNDATION_EXTERN NSString *const kSLReachabilityReachStatusChanged;
+///WWAN变化；WiFi网络也会变，跟当前网络有关；
+FOUNDATION_EXTERN NSString *const kSLReachabilityWWANChanged;
+///统一后的网络变化
+FOUNDATION_EXTERN NSString *const kSLReachabilityMaskChanged;
+```
 
 
 IPv6 Support
 ============
-Reachability fully supports IPv6.  More specifically, each of the APIs handles IPv6 in the following way:
-
-- reachabilityWithHostName and SCNetworkReachabilityCreateWithName:  Internally, this API works be resolving the host name to a set of IP addresses (this can be any combination of IPv4 and IPv6 addresses) and establishing separate monitors on all available addresses.
-
-- reachabilityWithAddress and SCNetworkReachabilityCreateWithAddress:  To monitor an IPv6 address, simply pass in an IPv6 `sockaddr_in6 struct` instead of the IPv4 `sockaddr_in struct`.
-
-- reachabilityForInternetConnection:  This monitors the address 0.0.0.0, which reachability treats as a special token that causes it to actually monitor the general routing status of the device, both IPv4 and IPv6.
-
-
-
-Removal of reachabilityForLocalWiFi
-============
-Older versions of this sample included the method reachabilityForLocalWiFi. As originally designed, this method allowed apps using Bonjour to check the status of "local only" Wi-Fi (Wi-Fi without a connection to the larger internet) to determine whether or not they should advertise or browse. 
-
-However, the additional peer-to-peer APIs that have since been added to iOS and OS X have rendered it largely obsolete.  Because of the narrow use case for this API and the large potential for misuse, reachabilityForLocalWiFi has been removed from Reachability.
-
-Apps that have a specific requirement can use reachabilityWithAddress to monitor IN_LINKLOCALNETNUM (that is, 169.254.0.0).  
-
-Note: ONLY apps that have a specific requirement should be monitoring IN_LINKLOCALNETNUM.  For the overwhelming majority of apps, monitoring this address is unnecessary and potentially harmful.
-
-
-Using the Sample
-================
-
-Build and run the sample using Xcode. When running the iPhone Simulator, you can exercise the application by disconnecting the Ethernet cable, turning off AirPort, or by joining an ad-hoc local Wi-Fi network.
-
-By default, the application uses www.apple.com for its remote host. You can change the host it uses in APLViewController.m by modifying the value of the remoteHostName variable in -viewDidLoad.
-
-IMPORTANT: Reachability must use DNS to resolve the host name before it can determine the Reachability of that host, and this may take time on certain network connections.  Because of this, the API will return NotReachable until name resolution has completed.  This delay may be visible in the interface on some networks.
-
-The Reachability sample demonstrates the asynchronous use of the SCNetworkReachability API. You can use the API synchronously, but do not issue a synchronous check by hostName on the main thread. If the device cannot reach a DNS server or is on a slow network, a synchronous call to the SCNetworkReachabilityGetFlags function can block for up to 30 seconds trying to resolve the hostName. If this happens on the main thread, the application watchdog will kill the application after 20 seconds of inactivity.
-
-SCNetworkReachability API's do not currently provide a means to detect support for device level peer-to-peer networking, including Multipeer Connectivity, GameKit, Game Center, or peer-to-peer NSNetService.
-
-
-Main Files
-==========
-
-Reachability.{h,m}
- -Basic demonstration of how to use the SystemConfiguration Reachablity APIs.
-
-APLViewController.{h,m}
-- Simple view controller that displays information about network reachability.
-
-
-=============================================
-Copyright (C) Apple Inc. All rights reserved.
+SLReachability 完全支持 IPv6 ，具体可参照 Reachability 的解释或者查看源码。
 

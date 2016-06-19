@@ -14,10 +14,10 @@
 
 #import "SLReachability.h"
 
-NS_INLINE SLNetWorkStatus WWANTypeWithRadioAccessTechnology(NSString* radioAcc)
+NS_INLINE SLWWANStatus WWANTypeWithRadioAccessTechnology(NSString* radioAcc)
 {
     if (!radioAcc) {
-        return SLNetWorkStatusUnavailable;
+        return SLWWANNotReachable;
     }
     NSDictionary* WWANTypes = @{CTRadioAccessTechnologyGPRS:        @(SLNetWorkStatusWWAN2G),
                                 CTRadioAccessTechnologyEdge:        @(SLNetWorkStatusWWAN2G),
@@ -47,7 +47,7 @@ NSString *const kSLReachabilityMaskChanged = @"kSLReachabilityMaskChanged";
 @property (nonatomic, retain) CTTelephonyNetworkInfo* radioAccessInfo;
 
 @property (nonatomic, assign) SLReachStatus reachStatus;
-@property (nonatomic, assign) SLNetWorkStatus wwanType;
+@property (nonatomic, assign) SLWWANStatus wwanType;
 @property (nonatomic, assign, readwrite) SLNetWorkStatusMask netWorkMask;
 @property (nonatomic, copy) void(^ProviderDidUpdate)(CTCarrier* carrier);
 
@@ -108,9 +108,6 @@ static void ReachabilityCallback(SCNetworkReachabilityRef target, SCNetworkReach
                 self.ProviderDidUpdate(carrier);
             }
         };
-        _netWorkMask = SLNetWorkStatusMaskUnavailable;
-        _wwanType = SLNetWorkStatusUnavailable;
-        _reachStatus = SLNotReachable;
         _allowUseWWAN = YES;
     }
     return self;
@@ -212,7 +209,7 @@ static void ReachabilityCallback(SCNetworkReachabilityRef target, SCNetworkReach
 {
     dispatch_async(dispatch_get_main_queue(), ^{
         NSString *radioAcc = [notifi object];
-        SLNetWorkStatus wwanType = WWANTypeWithRadioAccessTechnology(radioAcc);
+        SLWWANStatus wwanType = WWANTypeWithRadioAccessTechnology(radioAcc);
         self.wwanType = wwanType;
     });
 }
@@ -299,16 +296,16 @@ static void ReachabilityCallback(SCNetworkReachabilityRef target, SCNetworkReach
 
 #pragma mark - wwan 网络
 
-- (SLNetWorkStatus)currentRadioAccessTechnology
+- (SLWWANStatus)currentRadioAccessTechnology
 {
     NSString *radioAcc = [self.radioAccessInfo currentRadioAccessTechnology];
-    SLNetWorkStatus type = WWANTypeWithRadioAccessTechnology(radioAcc);
+    SLWWANStatus type = WWANTypeWithRadioAccessTechnology(radioAcc);
     return type;
 }
 
 #pragma mark - 更新网络状态
 
-- (SLNetWorkStatusMask)netWorkStatusMaskWithNetStatus:(SLReachStatus) netStatus WWANType:(SLNetWorkStatus)wwanType WWANReachable:(BOOL)wwanReachable
+- (SLNetWorkStatusMask)netWorkStatusMaskWithNetStatus:(SLReachStatus) netStatus WWANType:(SLWWANStatus)wwanType WWANReachable:(BOOL)wwanReachable
 {
     SLNetWorkStatusMask mask = 0;
     switch (netStatus) {
@@ -345,7 +342,7 @@ static void ReachabilityCallback(SCNetworkReachabilityRef target, SCNetworkReach
 #endif
 }
 
-- (void)setWwanType:(SLNetWorkStatus)wwanType
+- (void)setWwanType:(SLWWANStatus)wwanType
 {
     if (_wwanType != wwanType) {
         _wwanType = wwanType;
