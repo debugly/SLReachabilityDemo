@@ -1,7 +1,8 @@
 //
 //  SLReachability.m
 //  Reachability
-//
+//  https://github.com/debugly/SLReachabilityDemo
+
 //  Created by xuqianlong on 16/6/15.
 //  Copyright © 2016年 Apple Inc. All rights reserved.
 //
@@ -335,11 +336,19 @@ static void ReachabilityCallback(SCNetworkReachabilityRef target, SCNetworkReach
     //update
     SLNetWorkStatusMask mask = [self netWorkStatusMaskWithNetStatus:_reachStatus WWANType:_wwanType WWANReachable:_allowUseWWAN];
     self.netWorkMask = mask;
-    [self postNotifi:kSLReachabilityMaskChanged];
     //log it
 #ifdef DEBUG
     NSLog(@"net is: [%@]",SLNetWorkStatusMask2String(mask));
 #endif
+}
+
+- (void)setNetWorkMask:(SLNetWorkStatusMask)netWorkMask
+{
+    if(_netWorkMask != netWorkMask)
+    {
+        _netWorkMask = netWorkMask;
+        [self postNotifi:kSLReachabilityMaskChanged];
+    }
 }
 
 - (void)setWwanType:(SLWWANStatus)wwanType
@@ -350,7 +359,7 @@ static void ReachabilityCallback(SCNetworkReachabilityRef target, SCNetworkReach
         [self postNotifi:kSLReachabilityWWANChanged];
     }
 }
-
+//修改了设置里的开关
 - (void)setAllowUseWWAN:(BOOL)allowUseWWAN
 {
     if(_allowUseWWAN != allowUseWWAN)

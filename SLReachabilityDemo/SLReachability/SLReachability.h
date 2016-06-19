@@ -1,7 +1,8 @@
 //
 //  SLReachability.h
 //  Reachability
-//
+//  https://github.com/debugly/SLReachabilityDemo
+
 //  Created by xuqianlong on 16/6/15.
 //  Copyright © 2016年 Apple Inc. All rights reserved.
 
@@ -14,6 +15,8 @@
 //Reachability fully support IPv6.
 
 //auto start observer!
+
+
 
 @import Foundation;
 @import SystemConfiguration;
